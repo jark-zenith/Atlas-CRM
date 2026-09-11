@@ -1,38 +1,69 @@
 import { Router, Request, Response } from 'express'
-import { deals, generateId } from '../models/index'
-import { Deal } from '../types/index'
+import { supabase } from '../lib/supabase.js'
+import { Deal } from '../types/index.js'
 
 const router = Router()
 
 // GET all deals
-router.get('/', (_req: Request, res: Response) => {
-  const dealList = Array.from(deals.values())
-  res.json(dealList)
+router.get('/', async (_req: Request, res: Response): Promise<void> => {
+  const { data, error } = await supabase
+    .from('deals')
+    .select('*')
+    .order('createdAt', { ascending: false })
+
+  if (error) {
+    console.error('Failed to fetch deals:', error)
+    res.status(500).json({ error: 'Failed to fetch deals' })
+    return
+  }
+
+  res.json(data as Deal[])
 })
 
 // GET deal by ID
-router.get('/:id', (req: Request, res: Response): void => {
-  const deal = deals.get(req.params.id)
-  if (!deal) {
+router.get('/:id', async (req: Request, res: Response): Promise<void> => {
+  const { data, error } = await supabase
+    .from('deals')
+    .select('*')
+    .eq('id', req.params.id)
+    .single()
+
+  if (error || !data) {
     res.status(404).json({ error: 'Deal not found' })
     return
   }
-  res.json(deal)
+
+  res.json(data as Deal)
 })
 
 // POST create deal
-router.post('/', (req: Request, res: Response): void => {
+router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, value, currency, stage, customerId, contactId, expectedCloseDate, probability, notes } = req.body
-    
-    if (!name || !value || !customerId) {
-      res.status(400).json({ error: 'name, value, and customerId are required' })
+    const {
+      name,
+      value,
+      currency,
+      stage,
+      customerId,
+      contactId,
+      expectedCloseDate,
+      probability,
+      notes,
+    } = req.body
+
+    if (!name || value === undefined || value === null || !customerId) {
+      res.status(400).json({
+        error: 'name, value, and customerId are required',
+      })
       return
     }
-    
+
     const now = new Date().toISOString()
+
     const newDeal: Deal = {
-      id: generateId(),
+      id:
+        Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15),
       name,
       value,
       currency: currency || 'USD',
@@ -40,52 +71,97 @@ router.post('/', (req: Request, res: Response): void => {
       customerId,
       contactId,
       expectedCloseDate,
-      probability: probability || 50,
+      probability: probability ?? 50,
       notes,
       createdAt: now,
       updatedAt: now,
     }
-    
-    deals.set(newDeal.id, newDeal)
-    res.status(201).json(newDeal)
+
+    const { data, error } = await supabase
+      .from('deals')
+      .insert(newDeal)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Failed to create deal:', error)
+      res.status(500).json({ error: 'Failed to create deal' })
+      return
+    }
+
+    res.status(201).json(data as Deal)
   } catch (error) {
+    console.error('Failed to create deal:', error)
     res.status(500).json({ error: 'Failed to create deal' })
   }
 })
 
 // PUT update deal
-router.put('/:id', (req: Request, res: Response): void => {
+router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const deal = deals.get(req.params.id)
-    if (!deal) {
+    const { data: existingDeal, error: findError } = await supabase
+      .from('deals')
+      .select('*')
+      .eq('id', req.params.id)
+      .single()
+
+    if (findError || !existingDeal) {
       res.status(404).json({ error: 'Deal not found' })
       return
     }
-    
-    const updated: Deal = {
-      ...deal,
+
+    const updated = {
+      ...existingDeal,
       ...req.body,
-      id: deal.id,
-      createdAt: deal.createdAt,
+      id: existingDeal.id,
+      createdAt: existingDeal.createdAt,
       updatedAt: new Date().toISOString(),
     }
-    
-    deals.set(updated.id, updated)
-    res.json(updated)
+
+    const { data, error } = await supabase
+      .from('deals')
+      .update(updated)
+      .eq('id', req.params.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Failed to update deal:', error)
+      res.status(500).json({ error: 'Failed to update deal' })
+      return
+    }
+
+    res.json(data as Deal)
   } catch (error) {
+    console.error('Failed to update deal:', error)
     res.status(500).json({ error: 'Failed to update deal' })
   }
 })
 
 // DELETE deal
-router.delete('/:id', (req: Request, res: Response): void => {
-  const deal = deals.get(req.params.id)
-  if (!deal) {
+router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+  const { data: existingDeal, error: findError } = await supabase
+    .from('deals')
+    .select('id')
+    .eq('id', req.params.id)
+    .single()
+
+  if (findError || !existingDeal) {
     res.status(404).json({ error: 'Deal not found' })
     return
   }
-  
-  deals.delete(req.params.id)
+
+  const { error } = await supabase
+    .from('deals')
+    .delete()
+    .eq('id', req.params.id)
+
+  if (error) {
+    console.error('Failed to delete deal:', error)
+    res.status(500).json({ error: 'Failed to delete deal' })
+    return
+  }
+
   res.json({ success: true, message: 'Deal deleted' })
 })
 

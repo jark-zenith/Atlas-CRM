@@ -1,12 +1,11 @@
 import express, { Express, Request, Response } from 'express'
-import { seedData } from './models/index'
-import customerRoutes from './routes/customers'
-import leadRoutes from './routes/leads'
-import contactRoutes from './routes/contacts'
-import dealRoutes from './routes/deals'
-import taskRoutes from './routes/tasks'
-import noteRoutes from './routes/notes'
-import dashboardRoutes from './routes/dashboard'
+import customerRoutes from './routes/customers.js'
+import leadRoutes from './routes/leads.js'
+import contactRoutes from './routes/contacts.js'
+import dealRoutes from './routes/deals.js'
+import taskRoutes from './routes/tasks.js'
+import noteRoutes from './routes/notes.js'
+import dashboardRoutes from './routes/dashboard.js'
 
 const app: Express = express()
 const PORT = process.env.PORT || 3000
@@ -29,8 +28,6 @@ app.use((req: Request, res: Response, next: () => void): void => {
   next()
 })
 
-// Initialize data
-seedData()
 
 // API Routes
 app.get('/api/health', (_req: Request, res: Response) => {

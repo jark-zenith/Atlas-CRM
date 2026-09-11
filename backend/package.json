@@ -11,11 +11,15 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "express": "^4.19.2"
+    "@supabase/supabase-js": "^2.109.0",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "ws": "^8.21.3"
   },
   "devDependencies": {
     "@types/express": "^4.17.22",
     "@types/node": "^20.12.12",
+    "@types/ws": "^8.18.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.4.5"
   }

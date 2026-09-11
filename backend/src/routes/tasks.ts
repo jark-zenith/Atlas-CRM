@@ -1,38 +1,67 @@
 import { Router, Request, Response } from 'express'
-import { tasks, generateId } from '../models/index'
-import { Task } from '../types/index'
+import { supabase } from '../lib/supabase.js'
+import { Task } from '../types/index.js'
 
 const router = Router()
 
 // GET all tasks
-router.get('/', (_req: Request, res: Response) => {
-  const taskList = Array.from(tasks.values())
-  res.json(taskList)
+router.get('/', async (_req: Request, res: Response): Promise<void> => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .order('dueDate', { ascending: true })
+
+  if (error) {
+    console.error('Failed to fetch tasks:', error)
+    res.status(500).json({ error: 'Failed to fetch tasks' })
+    return
+  }
+
+  res.json(data as Task[])
 })
 
 // GET task by ID
-router.get('/:id', (req: Request, res: Response): void => {
-  const task = tasks.get(req.params.id)
-  if (!task) {
+router.get('/:id', async (req: Request, res: Response): Promise<void> => {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select('*')
+    .eq('id', req.params.id)
+    .single()
+
+  if (error || !data) {
     res.status(404).json({ error: 'Task not found' })
     return
   }
-  res.json(task)
+
+  res.json(data as Task)
 })
 
 // POST create task
-router.post('/', (req: Request, res: Response): void => {
+router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { title, description, dueDate, status, priority, customerId, leadId, dealId, assignedTo } = req.body
-    
+    const {
+      title,
+      description,
+      dueDate,
+      status,
+      priority,
+      customerId,
+      leadId,
+      dealId,
+      assignedTo,
+    } = req.body
+
     if (!title || !dueDate) {
       res.status(400).json({ error: 'title and dueDate are required' })
       return
     }
-    
+
     const now = new Date().toISOString()
+
     const newTask: Task = {
-      id: generateId(),
+      id:
+        Math.random().toString(36).substring(2, 15) +
+        Math.random().toString(36).substring(2, 15),
       title,
       description,
       dueDate,
@@ -45,47 +74,92 @@ router.post('/', (req: Request, res: Response): void => {
       createdAt: now,
       updatedAt: now,
     }
-    
-    tasks.set(newTask.id, newTask)
-    res.status(201).json(newTask)
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert(newTask)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Failed to create task:', error)
+      res.status(500).json({ error: 'Failed to create task' })
+      return
+    }
+
+    res.status(201).json(data as Task)
   } catch (error) {
+    console.error('Failed to create task:', error)
     res.status(500).json({ error: 'Failed to create task' })
   }
 })
 
 // PUT update task
-router.put('/:id', (req: Request, res: Response): void => {
+router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const task = tasks.get(req.params.id)
-    if (!task) {
+    const { data: existingTask, error: findError } = await supabase
+      .from('tasks')
+      .select('*')
+      .eq('id', req.params.id)
+      .single()
+
+    if (findError || !existingTask) {
       res.status(404).json({ error: 'Task not found' })
       return
     }
-    
-    const updated: Task = {
-      ...task,
+
+    const updated = {
+      ...existingTask,
       ...req.body,
-      id: task.id,
-      createdAt: task.createdAt,
+      id: existingTask.id,
+      createdAt: existingTask.createdAt,
       updatedAt: new Date().toISOString(),
     }
-    
-    tasks.set(updated.id, updated)
-    res.json(updated)
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(updated)
+      .eq('id', req.params.id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Failed to update task:', error)
+      res.status(500).json({ error: 'Failed to update task' })
+      return
+    }
+
+    res.json(data as Task)
   } catch (error) {
+    console.error('Failed to update task:', error)
     res.status(500).json({ error: 'Failed to update task' })
   }
 })
 
 // DELETE task
-router.delete('/:id', (req: Request, res: Response): void => {
-  const task = tasks.get(req.params.id)
-  if (!task) {
+router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
+  const { data: existingTask, error: findError } = await supabase
+    .from('tasks')
+    .select('id')
+    .eq('id', req.params.id)
+    .single()
+
+  if (findError || !existingTask) {
     res.status(404).json({ error: 'Task not found' })
     return
   }
-  
-  tasks.delete(req.params.id)
+
+  const { error } = await supabase
+    .from('tasks')
+    .delete()
+    .eq('id', req.params.id)
+
+  if (error) {
+    console.error('Failed to delete task:', error)
+    res.status(500).json({ error: 'Failed to delete task' })
+    return
+  }
+
   res.json({ success: true, message: 'Task deleted' })
 })
 
