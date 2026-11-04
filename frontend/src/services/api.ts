@@ -1,9 +1,9 @@
-const API_URL = ((import.meta as any).env.VITE_API_URL as string) || 'http://localhost:3000'
+const API_URL = (((import.meta as any).env.VITE_API_URL as string) || '').replace(/\/$/, '')
 
 async function handleResponse(response: Response) {
   if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.error || 'API error')
+    const error = await response.json().catch(() => null)
+    throw new Error(error?.error || `API request failed (${response.status})`)
   }
   return response.json()
 }
